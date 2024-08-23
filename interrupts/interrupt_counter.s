@@ -2,6 +2,9 @@ DDRA = $6003
 DDRB = $6002
 PORTA = $6001
 PORTB = $6000
+PCR = $600C ; Peripheral Control Register
+IFR = $600D
+IER = $600E
 
 counter = $0204 ; 2 bytes for the interrupt testing
 
@@ -21,6 +24,12 @@ reset:
   ldx #$ff
   txs		 ; Initializing the stack pointer at the top of the stack 
  
+  lda #00
+  sta PCR ; Write a 0 in the CA1 flag so that the raising edge is the one receiving the interrupt in the VIA
+
+  lda #$82
+  sta IER ; Setting the Interrupt Enable Register to receive interrupts from CA1 (in the Versatile Interface Adapter) and the Set/Clear flag
+
   cli ; clear the interrupt disable bit to allow interruptions
 
   
@@ -185,10 +194,32 @@ lcd_instruction:
 
 nmi:
 irq:
+  pha
+  txa 
+  pha
+  tya 
+  pha ; Store the value of the a, x and y registers in the stack 
+
   inc counter
   bne exit_irq
   inc counter + 1
 exit_irq:
+  ldy #$f5
+  ldx #$ff
+delay:
+  dex
+  bne delay
+  dey 
+  bne delay ; Add delay to debounce the button by software
+
+  bit PORTA ; Read port A to clear the interrupt, telling the VIA that the interrupt was already handled
+  
+  pla
+  tay
+  pla
+  tax
+  pla ; Restore the values of the a, x and y register from the stack to the CPU registers
+
   rti
 
   .org $fffa
