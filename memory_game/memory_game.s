@@ -36,7 +36,7 @@ reset:
   ldx #$ff
   txs		 ; Initializing the stack pointer at the top of the stack 
  
-  lda #00 ; 00 for the falling edge ; 10 for the rising edge
+  lda #10 ; 00 for the falling edge ; 10 for the rising edge
   sta PCR ; Write a 0 in the CB1 flag so that the falling edge is the one receiving the interrupt in the VIA
 
   lda #$90
@@ -61,16 +61,60 @@ reset:
   sta number
   sta number + 1 ; Initialize the number to be printed to 0
 
-  cli ; interrupts enabled
+  ;cli ; interrupts enabled
 
   ;lda #%00001010 ; Decimal number 10
   ;sta number  ; stored in number + 1 beacuse of Big Endian architecture
   ;jsr print_binary_number_in_lcd  ; Print the number stored in the accumulator in the screen
 
 infinite_loop:
+
+  lda %00000000
+  sta DDRA ; Set all the pins of PORTA to inputs
+
+  ;lda PORTA
+  ;sta number
+  ;jsr print_binary_number_in_lcd  ; Print the number read in the buttons
+
+  ; Checking Which button was the one triggering the interrupt
+  lda PORTA
+  and #LEFT_BUTTON
+  beq check_right_button
+  jsr left_button_function
+
+check_right_button:
+  lda PORTA
+  and #RIGHT_BUTTON
+  beq check_up_button
+  jsr right_button_function
+
+check_up_button:
+  lda PORTA
+  and #UP_BUTTON
+  beq check_down_button
+  jsr up_button_function
+
+check_down_button:
+  lda PORTA
+  and #DOWN_BUTTON
+  beq check_select_button
+  jsr down_button_function
+
+check_select_button:
+  lda PORTA
+  and #SELECT_BUTTON
+  beq default_case
+  ;jsr select_button_function
+
+default_case:
+  ;lda #"?"
+  ;jsr send_character  ; In the case that the signal was not detected by the PORTA, we send a "?" to the screen
+
+  lda %11111111
+  sta DDRA ; Set all the pins of PORTA to ouputs again
+
   jmp infinite_loop
   
-
 
 
 
@@ -244,38 +288,38 @@ irq:
   ;jsr print_binary_number_in_lcd  ; Print the number read in the buttons
 
   ; Checking Which button was the one triggering the interrupt
-  lda PORTA
-  and #LEFT_BUTTON
-  beq check_right_button
-  jsr left_button_function
+  ;lda PORTA
+  ;and #LEFT_BUTTON
+  ;beq check_right_button
+  ;jsr left_button_function
 
-check_right_button:
-  lda PORTA
-  and #RIGHT_BUTTON
-  beq check_up_button
-  jsr right_button_function
+;check_right_button:
+  ;lda PORTA
+  ;and #RIGHT_BUTTON
+  ;beq check_up_button
+  ;jsr right_button_function
 
-check_up_button:
-  lda PORTA
-  and #UP_BUTTON
-  beq check_down_button
-  jsr up_button_function
+;check_up_button:
+  ;lda PORTA
+  ;and #UP_BUTTON
+  ;beq check_down_button
+  ;jsr up_button_function
 
-check_down_button:
-  lda PORTA
-  and #DOWN_BUTTON
-  beq check_select_button
-  jsr down_button_function
+;check_down_button:
+  ;lda PORTA
+  ;and #DOWN_BUTTON
+  ;beq check_select_button
+  ;jsr down_button_function
 
-check_select_button:
-  lda PORTA
-  and #SELECT_BUTTON
-  beq default_case
+;check_select_button:
+  ;lda PORTA
+  ;and #SELECT_BUTTON
+  ;beq default_case
   ;jsr select_button_function
 
-default_case:
-  lda #"?"
-  jsr send_character  ; In the case that the signal was not detected by the PORTA, we send a "?" to the screen
+;default_case:
+  ;lda #"?"
+  ;jsr send_character  ; In the case that the signal was not detected by the PORTA, we send a "?" to the screen
 
   ; jmp force_exit_irq ; Exit the interrupt with no delay
   
