@@ -6,7 +6,7 @@ PCR = $600C ; Peripheral Control Register
 IFR = $600D ; Interrupt Flag Register
 IER = $600E ; Interrupt Enable Register
 
-counter = $0204 ; 2 bytes for the interrupt testing
+number = $0f04 ; 2 bytes for the binary number to be printed in the screen
 
 ; Data for the minuend and sustraend 
 minuend = $1000 ; 2 bytes (left side)
@@ -32,21 +32,20 @@ RS = %00100000
   .org $8000
  
 reset:
+  sei ; interrupts disabled
   ldx #$ff
   txs		 ; Initializing the stack pointer at the top of the stack 
  
-  lda #00
-  sta PCR ; Write a 0 in the CA1 flag so that the raising edge is the one receiving the interrupt in the VIA
+  lda #00 ; 00 for the falling edge ; 10 for the rising edge
+  sta PCR ; Write a 0 in the CB1 flag so that the falling edge is the one receiving the interrupt in the VIA
 
   lda #$90
   sta IER ; Setting the Interrupt Enable Register to receive interrupts from CB1 (in the Versatile Interface Adapter) and the Set/Clear flag
-
-  cli ; clear the interrupt disable bit to allow interruptions
-
   
   lda #%11111111 ; Set all the pins of PORTB to outputs
   sta DDRB
-  lda #%11111111 ; Initialize DDRA to be outputs for the E R/W and RS 
+  lda #%11111111 ; Initialize DDRA to be outputs for the E R/W and RS
+  ;lda #%11100000 ; Initialize DDRA to be outputs for the E R/W and RS (PA5-PA7) and inputs for the buttons (PA0-PA4)
   sta DDRA
 
   lda #%00111000 ; Set 8-bit mode; 2-line display; 5x8 font	
@@ -58,24 +57,39 @@ reset:
   lda #%00000001 ; Clear the display	
   jsr lcd_instruction
 
-infinte_loop:
-  jmp infinte_loop
-
   lda #0
-  sta counter
-  sta counter + 1 ; Initialize the counter to 0
+  sta number
+  sta number + 1 ; Initialize the number to be printed to 0
 
-loop:
-  lda #%00000010 ; Home position for cursor
-  jsr lcd_instruction
+  cli ; interrupts enabled
+
+  ;lda #%00001010 ; Decimal number 10
+  ;sta number  ; stored in number + 1 beacuse of Big Endian architecture
+  ;jsr print_binary_number_in_lcd  ; Print the number stored in the accumulator in the screen
+
+infinite_loop:
+  jmp infinite_loop
+  
+
+
+
+
+
+print_binary_number_in_lcd:
+
+  pha
+  txa 
+  pha
+  tya 
+  pha ; Store the value of the a, x and y registers in the stack 
 
   lda #0
   sta message ; So that message is null terminated always
 
 ; set up the variables to divide in memory (RAM) 
-  lda counter
+  lda number
   sta sustraend
-  lda counter + 1 
+  lda number + 1 
   sta sustraend + 1
 
 divisions:
@@ -126,15 +140,21 @@ ignore_result:
   ldx #0
 print:
   lda message,x
-  beq loop
+  beq exit_binary_subroutine
   jsr send_character
   inx
   jmp print
 
-  jmp loop
+  pla
+  tay
+  pla
+  tax
+  pla ; Restore the values of the a, x and y register from the stack to the CPU registers
 
+exit_binary_subroutine:
+  rts ; binary number printed in the screen
 
-number: .word 1980
+;number: .word 1980
 
 push_character:
   ldy #0 ; y register will be the index for the memory position we are working with
@@ -206,6 +226,8 @@ lcd_instruction:
   sta PORTA
   rts
 
+
+  .org $f800
 nmi:
 irq:
   pha
@@ -214,12 +236,14 @@ irq:
   tya 
   pha ; Store the value of the a, x and y registers in the stack 
 
-  ;lda PORTA ; Here we are reading PORTA, which is connected to the VIA and from the VIA to the user buttons
-  ;and $0500
-  ;beq force_exit_irq ; If the button pressed is not the one we are looking for, we exit the interrupt
+  lda %00000000
+  sta DDRA ; Set all the pins of PORTA to inputs
   
-  ; Checking Which button was the one triggering the interrupt
+  ;lda PORTA
+  ;sta number
+  ;jsr print_binary_number_in_lcd  ; Print the number read in the buttons
 
+  ; Checking Which button was the one triggering the interrupt
   lda PORTA
   and #LEFT_BUTTON
   beq check_right_button
@@ -240,27 +264,22 @@ check_up_button:
 check_down_button:
   lda PORTA
   and #DOWN_BUTTON
-  beq force_exit_irq
+  beq check_select_button
   jsr down_button_function
 
 check_select_button:
   lda PORTA
   and #SELECT_BUTTON
-  beq force_exit_irq
+  beq default_case
   ;jsr select_button_function
 
+default_case:
   lda #"?"
   jsr send_character  ; In the case that the signal was not detected by the PORTA, we send a "?" to the screen
 
-  jmp force_exit_irq 
+  ; jmp force_exit_irq ; Exit the interrupt with no delay
   
-  ;beq exit_irq
-
-  ;jsr left_button_function
-
-  ; inc counter
-  ; bne exit_irq
-  ; inc counter + 1
+  ; Exit the interrupt with a delay
 
 exit_irq:
   ldy #$f5
@@ -273,7 +292,12 @@ delay:
 
 force_exit_irq:
   bit PORTB ; Read port A to clear the interrupt, telling the VIA that the interrupt was already handled
+  lda $ff
+  sta IFR
   
+  lda %11111111
+  sta DDRA ; Set all the pins of PORTA to ouputs again
+
   pla
   tay
   pla
