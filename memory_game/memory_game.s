@@ -19,7 +19,7 @@ SELECT_BUTTON = %00000001
 LEFT_BUTTON = %00000010
 RIGHT_BUTTON = %00010000
 UP_BUTTON = %00000100
-DOWN_BUTTON = %00001000 ; This is the phisical address flag where the button signal will arrive in the 65C22 VIA at PORTA
+DOWN_BUTTON = %00001000 ; This is the physical address flag where the button signal will arrive in the 65C22 VIA at PORTA
 
 LEFT_ARROW = $7F
 RIGHT_ARROW = $7E
@@ -65,12 +65,24 @@ reset:
   lda #%00000001 ; Clear the display	
   jsr lcd_instruction
 
-  lda #0
-  sta counter
-  sta counter + 1  
   
+wait_interrupt:
+  jmp wait_interrupt
 
-loop:
+
+
+
+
+
+
+
+; ################## START OF LOOP FOR PRINTING IN A LOOP THE DECIMAL NUMBER IN THE LCD ##################
+  
+  lda #0          
+  sta counter     ; Start the counter at value 0
+  sta counter + 1 ; Start the counter at value 0
+
+decimal_loop:
   lda #%00000010 ; Home position for cursor
   jsr lcd_instruction
 
@@ -131,14 +143,24 @@ ignore_result:
   ldx #0
 print:
   lda message,x
-  beq loop
+  beq decimal_loop
   jsr send_character
   inx
   jmp print
 
-  jmp loop
+  jmp decimal_loop
 
-number: .word 1980
+; ################## END OF LOOP FOR PRINTING IN A LOOP THE DECIMAL NUMBER IN THE LCD ##################
+
+
+
+
+
+
+; #################### START OF SUBROUTINES ########################
+
+
+; START OF PUSH CHARACTER FUNCTION FOR THE DECIMAL PRINT
 
 push_character:
   ldy #0 ; y register will be the index for the memory position we are working with
@@ -167,6 +189,11 @@ char_loop:
   sta message,y
   
   rts
+
+ ; END OF PUSH CHARACTER FUNCTION FOR THE DECIMAL PRINT 
+
+
+; START OF SENDING A CHARANTER ATORED IN A TO THE LCD SCREEN
 
 send_character:
   jsr lcd_wait  ; checking the busy flag
@@ -218,9 +245,54 @@ irq:
   tya 
   pha ; Store the value of the a, x and y registers in the stack 
 
-  inc counter
-  bne exit_irq
-  inc counter + 1
+  ; Read PORTA and go through shift the values of the register to see
+  lda PORTA
+
+  ; Check buttons pressed
+  cmp #LEFT_BUTTON
+  bne check_right_button
+  pha ; store the value of PORTA in the stack before storing the arrow to print in the screen
+  lda #LEFT_ARROW
+  jsr send_character
+  pla ; restore the value of PORTA
+  jmp exit_irq
+
+check_right_button:
+  cmp #RIGHT_BUTTON
+  bne check_up_button
+  pha ; store the value of PORTA in the stack before storing the arrow to print in the screen
+  lda #RIGHT_ARROW
+  jsr send_character
+  pla ; restore the value of PORTA
+  jmp exit_irq
+
+check_up_button:
+  cmp #UP_BUTTON
+  bne check_down_button
+  pha ; store the value of PORTA in the stack before storing the arrow to print in the screen
+  lda #UP_ARROW
+  jsr send_character
+  pla ; restore the value of PORTA
+  jmp exit_irq
+
+check_down_button
+  cmp #DOWN_BUTTON
+  bne check_select_button
+  pha ; store the value of PORTA in the stack before storing the arrow to print in the screen
+  lda #DOWN_ARROW
+  jsr send_character
+  pla ; restore the value of PORTA
+  jmp exit_irq
+
+check_select_button:
+  cmp #SELECT_BUTTON
+  bne check_select_button
+  pha ; store the value of PORTA in the stack before storing the arrow to print in the screen
+  lda #"0"
+  jsr send_character
+  pla ; restore the value of PORTA
+
+
 exit_irq:
   ldy #$f5
   ldx #$ff
