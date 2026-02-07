@@ -7,3 +7,6 @@ Requirements
 - Five active-high buttons wired to PORTA bits: SELECT=PA0, LEFT=PA1, UP=PA2, DOWN=PA3, RIGHT=PA4 (polled).
 - LCD character ROM that displays arrow glyphs for codes 0x7F, 0x7E, 0x5E, 0x5F.
 - RAM usage: `number` at $0F04-$0F05, `message` at $0350+, `minuend`/`sustraend` at $1000-$1003.
+
+Connection
+![Breadboard computer interrupts for memory game](../assets/breadboard-computer-interrupts-for-memory-game.jpeg)

@@ -24,7 +24,7 @@ reset:
   ldx #$ff
   txs		 ; Initializing the stack pointer at the top of the stack 
  
-  lda #00
+  lda #$00
   sta PCR ; Write a 0 in the CA1 flag so that the raising edge is the one receiving the interrupt in the VIA
 
   lda #$82
