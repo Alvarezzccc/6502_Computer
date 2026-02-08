@@ -23,9 +23,8 @@ DOWN_BUTTON = %00001000 ; This is the physical address flag where the button sig
 
 LEFT_ARROW = $7F
 RIGHT_ARROW = $7E
-UP_ARROW = $5E
-DOWN_ARROW = $5F  ; This is the HEX representation of the arrows for the LCD screen (HITACHI HD44780U)
-
+PLUS_CHAR = $2B
+MINUS_CHAR = $2D
 
 E = %10000000
 RW = %01000000
@@ -65,8 +64,17 @@ reset:
   lda #%00000001 ; Clear the display	
   jsr lcd_instruction
 
+  lda #$00
+  sta $3000
   
 wait_interrupt:
+  lda $3000
+  cmp #$00
+  beq wait_interrupt
+  jsr send_character
+  lda #$00
+  sta $3000
+
   jmp wait_interrupt
 
 
@@ -239,6 +247,7 @@ lcd_instruction:
 
 nmi:
 irq:
+  php
   pha
   txa 
   pha
@@ -248,53 +257,50 @@ irq:
   ; Read PORTA and go through shift the values of the register to see
   lda PORTA
 
+  ; Mask only the 5 button bits (PA0..PA4) before comparing (PA5..PA7 are used for LCD control)
+  and #%00011111
+
   ; Check buttons pressed
   cmp #LEFT_BUTTON
   bne check_right_button
-  pha ; store the value of PORTA in the stack before storing the arrow to print in the screen
   lda #LEFT_ARROW
-  jsr send_character
-  pla ; restore the value of PORTA
+  ;jsr send_character
+  sta $3000
   jmp exit_irq
 
 check_right_button:
   cmp #RIGHT_BUTTON
   bne check_up_button
-  pha ; store the value of PORTA in the stack before storing the arrow to print in the screen
   lda #RIGHT_ARROW
-  jsr send_character
-  pla ; restore the value of PORTA
+  ;jsr send_character
+  sta $3000
   jmp exit_irq
 
 check_up_button:
   cmp #UP_BUTTON
   bne check_down_button
-  pha ; store the value of PORTA in the stack before storing the arrow to print in the screen
-  lda #UP_ARROW
-  jsr send_character
-  pla ; restore the value of PORTA
+  lda #PLUS_CHAR
+  ;jsr send_character
+  sta $3000
   jmp exit_irq
 
-check_down_button
+check_down_button:
   cmp #DOWN_BUTTON
   bne check_select_button
-  pha ; store the value of PORTA in the stack before storing the arrow to print in the screen
-  lda #DOWN_ARROW
-  jsr send_character
-  pla ; restore the value of PORTA
+  lda #MINUS_CHAR
+  ;jsr send_character
+  sta $3000
   jmp exit_irq
 
 check_select_button:
   cmp #SELECT_BUTTON
-  bne check_select_button
-  pha ; store the value of PORTA in the stack before storing the arrow to print in the screen
-  lda #"0"
-  jsr send_character
-  pla ; restore the value of PORTA
-
+  bne exit_irq
+  lda #"1"
+  ;jsr send_character
+  sta $3000
 
 exit_irq:
-  ldy #$f5
+  ldy #$f0
   ldx #$ff
 delay:
   dex
@@ -302,14 +308,14 @@ delay:
   dey 
   bne delay ; Add delay to debounce the button by software
 
-  bit PORTB ; Read port A to clear the interrupt, telling the VIA that the interrupt was already handled
-  
+  lda PORTB ; Read port A to clear the interrupt, telling the VIA that the interrupt was already handled
+
   pla
   tay
   pla
   tax
   pla ; Restore the values of the a, x and y register from the stack to the CPU registers
-
+  plp
   rti
 
   .org $fffa
