@@ -78,7 +78,6 @@ start_memory_game:
 
   jsr long_delay
 
-  jsr clear_lcd_display
   lda #<instructions_mesasge
   sta MESSAGE_POINTER
   lda #>instructions_mesasge
@@ -86,9 +85,9 @@ start_memory_game:
   jsr print_message
 
 
-
-start_message: .asciiz "Welcome to Memory Game"
-instructions_mesasge: .asciiz "Remember sequences"
+; 16 chars (line 1)        ; 16 chars (line 2)
+start_message:        .asciiz "Welcome to      Memory Game     "
+instructions_mesasge: .asciiz "Remember        sequences       "
 
 
 ; #################### START OF SUBROUTINES ########################
@@ -114,15 +113,21 @@ print_message:
   tya
   pha
 
+  jsr clear_lcd_display ; First make sure that the display is cleared
+
   ldy #$00
 print_message_loop:
   lda (MESSAGE_POINTER),y
   beq exit_print_message
   jsr send_character
   iny
+  tya
+  cmp #$10
   bne print_message_loop
-  rts    
-             ; o saltar a exit_print_message si quieres
+  lda #$40
+  jsr set_lcd_cursor_position
+  jmp print_message_loop ; continue printing next character if not yet finished
+               ; o saltar a exit_print_message si quieres
 exit_print_message:
 
   pla
@@ -163,7 +168,7 @@ long_delay:
   lda #5               ; Number of iterations (adjust to taste)
 
 long_delay_outer:
-  ; Inner delay block (same idea as your original wait loops)
+  ; Inner delay block
   ldy #$ff
   ldx #$ff
 long_delay_wait:
@@ -184,7 +189,7 @@ long_delay_wait:
   tax
   rts
 
-; START OF SENDING A CHARANTER ATORED IN A TO THE LCD SCREEN
+; START OF SENDING A CHARACTER STORED IN REGISTER A TO THE LCD SCREEN
 
 send_character:
   jsr lcd_wait  ; checking the busy flag
@@ -197,6 +202,10 @@ send_character:
   sta PORTA
   rts
 
+; END OF SENDING A CHARACTER STORED IN REGISTER A TO THE LCD SCREEN
+
+; START OF WAITING FOR THE REPLY FROM THE LCD SCREEN
+
 lcd_wait:
   pha		 ; Pushing the accumulator into the stack to save the original instruction
   lda #%00000000 ; Set all the pins of PORTB to inputs
@@ -204,7 +213,7 @@ lcd_wait:
 lcd_busy: 
   lda #RW	 ; Setting the read BF instruction to send to the LCD module 
   sta PORTA
-  lda #(RW | E)	 ; Toggling the Enable bit of the LCD to laod the instruction
+  lda #(RW | E)	 ; Toggling the Enable bit of the LCD to loadd the instruction
   sta PORTA
   lda #RW
   sta PORTA
@@ -217,6 +226,11 @@ lcd_busy:
   
   pla		; Restoring the content of the original instruction into the accumulator 
   rts
+  
+; START OF WAITING FOR THE REPLY FROM THE LCD SCREEN
+
+
+; START OF SENDING AN INSTRUCTION TO THE LCD DISPLAY
 
 lcd_instruction:
   sta PORTB
@@ -228,6 +242,19 @@ lcd_instruction:
   sta PORTA
   rts
 
+; END OF SENDING AN INSTRUCTION TO THE LCD DISPLAY
+
+; START OF SENDING AN INSTRUCTION TO THE LCD DISPLAY
+
+set_lcd_cursor_position:
+  ora #$80 ; set bit 7 for set DDRAM instruction erasing the one from the subroutine call
+  jsr lcd_instruction
+  rts
+
+; END OF SENDING AN INSTRUCTION TO THE LCD DISPLAY
+
+
+; START OF NON-MASKABLE INRRUPTS AND NORMAL INTERRUPTS (ONLY USING NORMAL INTERRUPTS)
 nmi:
 irq:
   sei
@@ -291,6 +318,8 @@ exit_irq:
   plp
   cli
   rti
+
+  ; END OF NON-MASKABLE INRRUPTS AND NORMAL INTERRUPTS (ONLY USING NORMAL INTERRUPTS)
 
   .org $fffa
   .word nmi
