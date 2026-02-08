@@ -6,15 +6,6 @@ PCR = $600C ; Peripheral Control Register from VIA 6622
 IFR = $600D ; Interrupt Flag Register from VIA 6622
 IER = $600E ; Interrupt Enable Register from VIA 6622
 
-counter = $0204 ; 2 bytes for the interrupt testing
-
-; Data for the minuend and sustraend 
-minuend = $1000 ; 2 bytes (left side)
-sustraend = $1002 ; bytes (right side)
-
-message = $0350 ; memory allocated for the message to be sent to the screen
-
-
 SELECT_BUTTON = %00000001
 LEFT_BUTTON = %00000010
 RIGHT_BUTTON = %00010000
@@ -25,6 +16,16 @@ LEFT_ARROW = $7F
 RIGHT_ARROW = $7E
 PLUS_CHAR = $2B
 MINUS_CHAR = $2D
+
+ROUNDS_ARRAY      = $2000  ; 32 bytes: $2000..$201F (sequence to reproduce)
+ID_ROUND          = $2020  ; 0..31  (current round length-1, or “last index”)
+CURRENT_ROUND_POS = $2021  ; 0..ID_ROUND (user progress within current round)
+LAST_INPUT        = $2022  ; last button in THIS round (for “no repeats” rule)
+
+MESSAGE_POINTER = $00    ; 2 bytes: position of message to print with subroutine
+
+
+; VARIABLES FOR THE LCD SCREEN CONFIGURATION
 
 E = %10000000
 RW = %01000000
@@ -64,130 +65,124 @@ reset:
   lda #%00000001 ; Clear the display	
   jsr lcd_instruction
 
-  
-wait_interrupt:
-  jmp wait_interrupt
+
+main:
+
+start_memory_game:
+
+  lda #<start_message
+  sta MESSAGE_POINTER
+  lda #>start_message
+  sta MESSAGE_POINTER+1
+  jsr print_message
+
+  jsr long_delay
+
+  jsr clear_lcd_display
+  lda #<instructions_mesasge
+  sta MESSAGE_POINTER
+  lda #>instructions_mesasge
+  sta MESSAGE_POINTER+1
+  jsr print_message
 
 
 
-
-
-; ################## START OF LOOP FOR PRINTING IN A LOOP THE DECIMAL NUMBER IN THE LCD ##################
-  
-  lda #0          
-  sta counter     ; Start the counter at value 0
-  sta counter + 1 ; Start the counter at value 0
-
-decimal_loop:
-  lda #%00000010 ; Home position for cursor
-  jsr lcd_instruction
-
-  lda #0
-  sta message ; So that message is null terminated always
-
-; set up the variables to divide in memory (RAM) 
-  lda counter
-  sta sustraend
-  lda counter + 1 
-  sta sustraend + 1
-
-divisions:
-  lda #0
-  sta minuend
-  sta minuend + 1  
-  clc 
-
-  ldx #16 ; x cpu register will store the counter for each division problem
-  
-divide:
-  ; It is rotated left the first memory position (not the "+ 1") because Big Endian architecture
-  rol sustraend 
-  rol sustraend + 1 
-  rol minuend   
-  rol minuend  + 1 
-  
-  sec ; set the carry for the checking if it was modifyed
-
-  lda minuend
-  sbc #10 ; decimal 10 stored in accumulator
-  tay ; y register is storing the result
-  lda minuend + 1 
-  sbc #0 ; substracting with carry so that we can check if it was modifyed (subs 0 is equal to nothing)
-  bcc ignore_result
-
-; store the result in minuend
-  sty minuend ; low byte of minuend was in y register
-  sta minuend + 1 ; high byte of minuend was in accumulator
-
-ignore_result:
-  dex
-  bne divide ; if we have already finished the 16 iterations loop
-  rol sustraend; rotate left in the last iteration of this division problem
-  rol sustraend + 1
-
-  lda minuend ; The rest or minuend we want is stored in memory
-  clc
-  adc #"0" ; pass from binary number to ASCII number
-  jsr push_character ; Push the character in the correct order into the queue
-
-; if sustraend != 0, we continue dividing
-  lda sustraend
-  ora sustraend + 1
-  bne divisions
-
-; Here is the code for printing the message in the screen
-  ldx #0
-print:
-  lda message,x
-  beq decimal_loop
-  jsr send_character
-  inx
-  jmp print
-
-  jmp decimal_loop
-
-; ################## END OF LOOP FOR PRINTING IN A LOOP THE DECIMAL NUMBER IN THE LCD ##################
-
-
-
-
+start_message: .asciiz "Welcome to Memory Game"
+instructions_mesasge: .asciiz "Remember sequences"
 
 
 ; #################### START OF SUBROUTINES ########################
 
 
-; START OF PUSH CHARACTER FUNCTION FOR THE DECIMAL PRINT
+; START OF CLEARING LCD SCREEN
+clear_lcd_display:
+  pha
 
-push_character:
-  ldy #0 ; y register will be the index for the memory position we are working with
-  pha ; we want to have the char to be inserted in next position in the stack pointer pos 
-char_loop:
-  lda message,y ; store y pos in accumulator
-  tax ; then transfer it to the x register
+  lda #%00000001 ; Clear the display	
+  jsr lcd_instruction
 
-;store the char in the y message position
-  pla ; get the char from the stack
-  sta message,y
-  
-;increment the index  
-  iny
-
-;store the value in stack 
-  txa
-  pha ; push the char that was moved to place the new one to the stack (modifying z flag)
-
-;check if the end of the string is reached, if not -> store it in the correct position (back to char_loop)
-  bne char_loop 
-
-;if the end is achieved, we have in message,x NULL and we have to store it at the end
-;store the char in the y message position
-  pla ; get the char from the stack
-  sta message,y
-  
+  pla
   rts
 
- ; END OF PUSH CHARACTER FUNCTION FOR THE DECIMAL PRINT 
+; END OF CLEARING LCD SCREEN
 
+
+; START OF PRINTING A WHOLE MESSAGE IN THE LCD SCREEN
+
+print_message:
+  pha
+  tya
+  pha
+
+  ldy #$00
+print_message_loop:
+  lda (MESSAGE_POINTER),y
+  beq exit_print_message
+  jsr send_character
+  iny
+  bne print_message_loop
+  rts    
+             ; o saltar a exit_print_message si quieres
+exit_print_message:
+
+  pla
+  tay
+  pla
+  rts
+
+; END OF PRINTING A WHOLE MESSAGE IN THE LCD SCREEN
+
+short_delay:
+  ; save X and Y (6502 style)
+  txa
+  pha
+  tya
+  pha
+
+  ldy #$ff
+  ldx #$40       ; shorter than $ff/$ff, tweak as you like
+short_delay_wait:
+  dex
+  bne short_delay_wait
+  dey
+  bne short_delay_wait ; Add delay to debounce the button by software
+
+  pla
+  tay
+  pla
+  tax
+  rts
+
+long_delay:
+  ; Save X and Y (6502 style) so the caller doesn't lose registers
+  txa
+  pha
+  tya
+  pha
+
+  lda #5               ; Number of iterations (adjust to taste)
+
+long_delay_outer:
+  ; Inner delay block (same idea as your original wait loops)
+  ldy #$ff
+  ldx #$ff
+long_delay_wait:
+  dex
+  bne long_delay_wait
+  dey
+  bne long_delay_wait  ; Software delay loop
+
+  ; Decrement loop counter in A and repeat until it reaches 0
+  sec
+  sbc #1               ; A = A - 1
+  bne long_delay_outer
+
+  ; Restore Y and X (6502 style)
+  pla
+  tay
+  pla
+  tax
+  rts
 
 ; START OF SENDING A CHARANTER ATORED IN A TO THE LCD SCREEN
 
@@ -284,13 +279,7 @@ check_select_button:
   jsr send_character
 
 exit_irq:
-  ldy #$80
-  ldx #$ff
-delay:
-  dex
-  bne delay
-  dey 
-  bne delay ; Add delay to debounce the button by software
+  jsr short_delay
 
   lda PORTB ; Read port A to clear the interrupt, telling the VIA that the interrupt was already handled
 
