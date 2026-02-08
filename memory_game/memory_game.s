@@ -64,21 +64,9 @@ reset:
   lda #%00000001 ; Clear the display	
   jsr lcd_instruction
 
-  lda #$00
-  sta $3000
   
 wait_interrupt:
-  lda $3000
-  cmp #$00
-  beq wait_interrupt
-  jsr send_character
-  lda #$00
-  sta $3000
-
   jmp wait_interrupt
-
-
-
 
 
 
@@ -247,6 +235,7 @@ lcd_instruction:
 
 nmi:
 irq:
+  sei
   php
   pha
   txa 
@@ -264,43 +253,38 @@ irq:
   cmp #LEFT_BUTTON
   bne check_right_button
   lda #LEFT_ARROW
-  ;jsr send_character
-  sta $3000
+  jsr send_character
   jmp exit_irq
 
 check_right_button:
   cmp #RIGHT_BUTTON
   bne check_up_button
   lda #RIGHT_ARROW
-  ;jsr send_character
-  sta $3000
+  jsr send_character
   jmp exit_irq
 
 check_up_button:
   cmp #UP_BUTTON
   bne check_down_button
   lda #PLUS_CHAR
-  ;jsr send_character
-  sta $3000
+  jsr send_character
   jmp exit_irq
 
 check_down_button:
   cmp #DOWN_BUTTON
   bne check_select_button
   lda #MINUS_CHAR
-  ;jsr send_character
-  sta $3000
+  jsr send_character
   jmp exit_irq
 
 check_select_button:
   cmp #SELECT_BUTTON
   bne exit_irq
   lda #"1"
-  ;jsr send_character
-  sta $3000
+  jsr send_character
 
 exit_irq:
-  ldy #$f0
+  ldy #$80
   ldx #$ff
 delay:
   dex
@@ -316,6 +300,7 @@ delay:
   tax
   pla ; Restore the values of the a, x and y register from the stack to the CPU registers
   plp
+  cli
   rti
 
   .org $fffa
