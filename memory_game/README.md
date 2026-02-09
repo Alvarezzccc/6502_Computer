@@ -1,7 +1,9 @@
 # memory_game
 
 ## Overview
-This program runs a memory/sequence game on a 6502 system with a 65C22 VIA and an HD44780-compatible LCD. After showing three intro messages on the LCD, it enables interrupts and waits for button presses; each IRQ is decoded into a character (left/right arrow, plus, minus, or "1" for select) and validated against the current round sequence. Correct inputs are echoed to the display, and once the round is completed the new input is appended to the sequence, the next round number is printed, and the game continues. A wrong input shows an error message and halts in a loop, while completing 32 rounds (ID_ROUND reaches 31) prints a win message and loops forever.
+This program runs a memory/sequence game on a 6502 system with a 65C22 VIA and an HD44780-compatible LCD. I built this memory game because, while working through Ben Eater’s computer, I felt like I was following a very guided path. I wanted to go a bit deeper and create something original on my own, something I could enjoy with family and friends, learn from along the way, and hopefully reuse in the future, both professionally and personally (and if not, at least I’d have had a good time building it). The game is basically a turn-based “Simon Says” memory challenge. You can play it solo, but it’s much better with two people competing. Each round belongs to one player: they must repeat the full sequence accumulated so far and then add one new button press at the end. In round one, player 1 creates the first element; next round, player 2 repeats it and adds another; and so on. The sequence can grow up to 32 steps, matching the usable capacity of the LCD. The first player to make a mistake loses, and the winner is the one who can best remember both their own and their opponent’s past sequences.
+
+I also created a simulator of this computer hardware prepared to run this game in my website so thay you can copy paste the whole memory_game.s and run it: https://alcdaniel.com/memory-game-6502/  
 
 ## Game Rules (for testing)
 1. Round 1: The sequence is empty. Press any button (left, right, plus, minus, or select). The button is stored as the first sequence element and shown on the LCD. The round ends immediately and the message "Correct!! Next round:" appears with the next round number. The display is cleared to start the next round.
@@ -30,6 +32,8 @@ Quick test example: R1 press right. R2 repeat right, then add minus. R3 repeat r
   - E  = PA7
 - Data lines on PORTB:
   - D0..D7 = PB0..PB7
+
+![Breadboard computer interrupts for memory game](/assets/memory-game-init.jpg)
 
 ### Address space (system-level view)
 ```
@@ -103,7 +107,7 @@ FFFC │ Reset Vector   │  ($FFFC-$FFFD)
 
 ### Reset-time initialization
 - PCR is written with $10 to select edge behavior on the control-line interrupt input.
-- IER is written with $90 to enable the CA1 interrupt source and set the enable bit (bit7=1 means "set").
+- IER is written with $90 to enable the CB1 interrupt source and set the enable bit (bit7=1 means "set").
 - DDRB is set to outputs for LCD data; DDRA configures PA5..PA7 as outputs for LCD control.
 
 ### IRQ handler flow
@@ -205,5 +209,6 @@ FUNC manage_input_sequence(input_char):
 - `short_delay`: software debounce after each IRQ; saves/restores X and Y.
 - `long_delay`: used between intro messages and after completing a round before showing the next round text.
 
-## Connection Diagram
-![Breadboard computer interrupts for memory game](/assets/breadboard-computer-interrupts-for-memory-game.jpeg)
+```
+
+
