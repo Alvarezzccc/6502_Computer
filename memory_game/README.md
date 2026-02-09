@@ -139,6 +139,60 @@ FFFC │ Reset Vector   │  ($FFFC-$FFFD)
 - Win condition: when `ID_ROUND == 31` (32 rounds), show the win message and loop forever.
 - Error condition: show the error message and loop forever.
 
+
+### Pseudocode for manage_input_sequence
+```text
+FUNC manage_input_sequence(input_char):
+
+  # 0) “No repeats” rule (ignore identical consecutive presses)
+  IF input_char == LAST_INPUT:
+      RETURN
+  LAST_INPUT = input_char
+
+  # 1) Append step happens when CURRENT_ROUND_POS == ID_ROUND
+  IF CURRENT_ROUND_POS == ID_ROUND:
+
+      # 1.1) Win condition (32 rounds)
+      IF ID_ROUND == 31:
+          show WIN_MESSAGE and loop forever
+          RETURN
+
+      # 1.2) Store new element at current position
+      ROUNDS_ARRAY[CURRENT_ROUND_POS] = input_char
+
+      # 1.3) Echo input on LCD (jump to line 2 at pos 16)
+      IF CURRENT_ROUND_POS == 16:
+          set_cursor_to_line_2
+      lcd_print(input_char)
+
+      # 1.4) Prepare next round state
+      ID_ROUND = ID_ROUND + 1
+      CURRENT_ROUND_POS = 0
+      LAST_INPUT = 0xFF
+
+      # 1.5) Round-complete feedback
+      wait(long_delay)
+      show CORRECT_NEXT_ROUND
+      lcd_print_decimal(ID_ROUND + 1)
+      wait(long_delay)
+
+      clear_lcd()
+      RETURN
+
+  # 2) Validation step: compare against expected sequence value
+  expected = ROUNDS_ARRAY[CURRENT_ROUND_POS]
+
+  IF input_char != expected:
+      show ERROR_MESSAGE and loop forever
+      RETURN
+
+  # 2.1) Correct input: echo and advance
+  IF CURRENT_ROUND_POS == 16:
+      set_cursor_to_line_2
+  lcd_print(input_char)
+  CURRENT_ROUND_POS = CURRENT_ROUND_POS + 1
+  RETURN
+
 ## Decimal Printing (multi-digit) Routine
 `print_decimal_using_my_algorithm` converts a small binary value (1..32) into ASCII digits:
 - `sustraend` holds the working dividend (quotient).
