@@ -126,7 +126,7 @@ start_message:        .asciiz " Welcome to the   Memory Game   "
 instructions_message: .asciiz "    Remember       sequences    "
 input_message:        .asciiz " Input commands    with buttons "
 error_message:        .asciiz "Error, you didn't  remember well"
-correct_next_round:   .asciiz "   Correct!!       Next round: "
+correct_next_round:   .asciiz "   Correct!!      Next round: "
 win_message:          .asciiz "   You won all     32 rounds!    "
 
 
